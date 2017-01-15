@@ -1,0 +1,127 @@
+---
+title: "ReproResearchAssignment1"
+author: "M Mach"
+date: "1/15/2017"
+output: html_document
+---
+
+##Introduction
+
+It is now possible to collect a large amount of data about personal movement using activity monitoring devices such as a Fitbit, Nike Fuelband, or Jawbone Up. These type of devices are part of the “quantified self” movement – a group of enthusiasts who take measurements about themselves regularly to improve their health, to find patterns in their behavior, or because they are tech geeks. But these data remain under-utilized both because the raw data are hard to obtain and there is a lack of statistical methods and software for processing and interpreting the data.
+
+This assignment makes use of data from a personal activity monitoring device. This device collects data at 5 minute intervals through out the day. The data consists of two months of data from an anonymous individual collected during the months of October and November, 2012 and include the number of steps taken in 5 minute intervals each day.
+
+##Assignment
+
+This assignment will be described in multiple parts. You will need to write a report that answers the questions detailed below. Ultimately, you will need to complete the entire assignment in a single R markdown document that can be processed by knitr and be transformed into an HTML file.
+
+Throughout your report make sure you always include the code that you used to generate the output you present. When writing code chunks in the R markdown document, always use 𝚎𝚌𝚑𝚘 = 𝚃𝚁𝚄𝙴 so that someone else will be able to read the code. This assignment will be evaluated via peer assessment so it is essential that your peer evaluators be able to review the code for your analysis.
+
+1) First, we must load the data from the working directory. The "activity.csv" file must be in your working directory for the data to load properly.
+
+```{r, echo=TRUE, message=FALSE}
+library(knitr)
+library(ggplot2)
+library(dplyr)
+opts_chunk$set(echo=TRUE,results="show",cache=TRUE)
+```
+
+```{r, echo=TRUE}
+data <- read.csv("./activity.csv", header = TRUE)
+data$date <- as.Date(data$date)
+summary(data)
+```
+
+
+2) Now that the data is loaded, we can procede with our analysis. First, we will create a histogram of the number of steps taken each day by the subject. To do this, we can group the data by "date" and summarize by "steps." Next, we create a histogram using the grouped data.
+
+```{r, echo=TRUE}
+#Group data
+stepsByday <- data %>% filter(!is.na(steps)) %>% group_by(date) %>% summarize(steps = sum(steps)) %>% print
+#Generate plot
+ggplot(stepsByday, aes(x = steps)) + geom_histogram(fill = "navy blue", binwidth = 2000) + labs(title = "Histogram: Steps per day", x = "Steps per day", y = "Frequency")
+```
+
+3) We can use the same grouped data to provide a mean and median number of steps taken each day.
+
+```{r}
+stepsMean <- mean(stepsByday$steps, na.rm=TRUE)
+print(stepsMean)
+stepsMedian <- median(stepsByday$steps, na.rm=TRUE)
+print(stepsMedian)
+```
+
+The histogram shows that the subject takes an average approximately 10,700 steps each day.
+
+4) To see the average daily activity pattern for the subject, we can create a time series plot. Instead of grouping our data by "data" as we did earlier, we can group by "interval" and summarize by the mean number of "steps" for each interval.
+
+```{r}
+#group and summarize data
+interval <- data %>% filter(!is.na(steps)) %>% group_by(interval) %>% summarize(steps = mean(steps)) %>% print
+#generate plot
+ggplot(interval, aes(x=interval, y=steps)) + geom_line(color = "navy blue")
+```
+
+The time series graph indicates that the subject usually takes more steps in the earlier part of the day.
+
+5) Next, we can also show the 5 minute interval that contains the most steps on average.
+
+```{r}
+interval[which.max(interval$steps),]
+```
+
+6) The data currently contains several missing values. In order to impute these missing values, we can calculate the mean steps by interval, and then place this value in each missing value.
+
+```{r}
+allData <- data
+nas <- is.na(allData$steps)
+meanInterval <- tapply(allData$steps, allData$interval, mean, na.rm=TRUE, simplify=TRUE)
+allData$steps[nas] <- meanInterval[as.character(allData$interval[nas])]
+sum(is.na(data$steps))
+sum(is.na(allData$steps))
+```
+
+7) Next, we can incorporate the imputed values into a new histogram. To do this, we must use the new imputed data to group values by date and summarize the data by steps taken. After this, we can plot the grouped data.
+
+```{r}
+#group data
+allSteps <- allData %>% filter(!is.na(steps)) %>% group_by(date) %>% summarize(steps = sum(steps)) %>% print
+#generate plot
+ggplot(allSteps, aes(x = steps)) + geom_histogram(fill = "navy blue", binwidth = 2000) + labs(title = "Histogram: Steps per day with imputed values", x = "Steps per day", y = "Frequency")
+```
+
+The new Mean and Median of the data with imputed values:
+
+```{r}
+meanAllSteps <- mean(allSteps$steps, na.rm = TRUE)
+print(meanAllSteps)
+medianAllSteps <- median(allSteps$steps, na.rm = TRUE)
+print(medianAllSteps)
+```
+
+After taking into account the new imputed values, we can see that the mean and median are equal. Previsouly, the median was slightly lower than the mean, indicating a left skew. By imputing the missing values as the average, we have equalized the mean and median.
+
+8) Using this new imputed data, we can create a new factor, "weektype," that segments our data by values collected on weekdays and values collected on the weekend.
+
+```{r}
+weekData <- mutate(allData, weektype = ifelse(weekdays(allData$date) == "Saturday" | weekdays(allData$date) == "Sunday", "weekend", "weekday"))
+weekData$weektype <- as.factor(weekData$weektype)
+```
+The new data and variable can be seen in the data header below.
+```{r}
+head(weekData)
+```
+
+Using this new variable, we can create a new time series chart that shows the difference between steps taken during the work week and during the weekend.
+
+```{r}
+#group data
+allInterval <- weekData %>% group_by(interval, weektype) %>% summarise(steps = mean(steps))
+#generage plot
+graph <- ggplot(allInterval, aes(x=interval, y=steps, color = weektype)) + geom_line() + facet_wrap(~weektype, ncol = 1, nrow=2)
+print(graph)
+```
+
+The new time series charts show that on weekdays the subject takes more steps in the early part of the day, then fewer steps through the rest of the day. However, on the weekend the subect is more active throughout the day. This may be a result of the subject's job. The subject may be working out or walking to work in the morning, then sitting at a desk all day. During the weekend, he may be taking less steps per interval, but more consistently active throughout the day. 
+
+
